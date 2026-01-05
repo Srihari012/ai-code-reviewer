@@ -4,7 +4,7 @@ def calculate(a,b):
 def main():
     print("Welcome to the Calculator")
     val = calculate(5,10)
-    print("Result is: "+ val)
+    print("Result is: "+ vol)
 
-if __name__ == "__manin__":
+if __name__ == "__main__":
     main()
