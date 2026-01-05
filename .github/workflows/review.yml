@@ -1,4 +1,4 @@
-name : AI Code Review
+name: AI Code Review Agent
 
 on:
   pull_request:
@@ -9,23 +9,23 @@ permissions:
   pull-requests: write
 
 jobs:
-  review_code:
+  review:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v3
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: '3.13' 
 
-      - name: Install Libs
-        run: pip install PyGithub requests google-generativeai
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
 
-      - name: Run Reviewer
+      - name: Run AI Review Agent
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: python scripts/ai_reviewer.py
+        run: python review_agent.py

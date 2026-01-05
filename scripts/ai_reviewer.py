@@ -1,28 +1,20 @@
 import os
-import requests
-import google.generativeai as genai
+from google import genai
 from github import Github
 
+# 1. Configuration
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-REPO_NAME = os.getenv("REPO_NAME")
+API_KEY = os.getenv("GOOGLE_API_KEY")  # Using the variable that worked for you
+REPO_NAME = os.getenv("GITHUB_REPOSITORY")
 PR_NUMBER = os.getenv("PR_NUMBER")
 
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
-g = Github(GITHUB_TOKEN)
-repo = g.get_repo(REPO_NAME)
-pr = repo.get_pull(PR_NUMBER)
+# 2. Configure Gemini (New Syntax)
+client = genai.Client(api_key=API_KEY)
 
-def get_diff():
-    headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github.v3.diff",
-    }
-    return requests.get(pr.url, headers=headers).text
-
-def analyze_diff(diff):
-    prompt = """
+def analyze_code(diff_text):
+    """Constructs prompt and sends diff to Gemini 2.5."""
+    
+    system_prompt = """
     You are a Senior Software Engineer reviewing a Pull Request.
     Your goal is to analyze the following code DIFF and identify:
     1. CRITICAL BUGS (Logic errors, potential crashes)
@@ -38,17 +30,52 @@ def analyze_diff(diff):
     - If there are issues, format your response in Markdown.
     - Provide specific code snippets for fixes.
     """
-    try:
-        response = model.generate_content(
-            [prompt, f"DIFF:\n{diff}"]
-        )
-        return response.text.strip()
-    except Exception as e:
-        return f"Error during analysis: {str(e)}"
     
+    try:
+        # Using the new google-genai syntax
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=f"{system_prompt}\n\nGIT DIFF:\n{diff_text}"
+        )
+        return response.text
+    except Exception as e:
+        return f"Error analyzing code with AI: {str(e)}"
+
+def main():
+    # 3. Connect to GitHub
+    if not GITHUB_TOKEN or not API_KEY:
+        print("Error: Missing Environment Variables")
+        return
+
+    g = Github(GITHUB_TOKEN)
+    repo = g.get_repo(REPO_NAME)
+    pr = repo.get_pull(int(PR_NUMBER))
+
+    # 4. Extract Diffs
+    print(f"Fetching diff for PR #{PR_NUMBER}...")
+    diff_content = ""
+    
+    # Get the specific files changed in this PR
+    for file in pr.get_files():
+        if file.status == "removed":
+            continue
+        # Check for code files
+        if not file.filename.endswith(('.py', '.js', '.ts', '.java', '.cpp', '.html', '.css')):
+            continue
+            
+        diff_content += f"\n\n--- File: {file.filename} ---\n{file.patch}"
+
+    if not diff_content:
+        print("No applicable code changes found.")
+        return
+
+    # 5. Analyze and Post Comment
+    print("Sending diff to Gemini...")
+    review = analyze_code(diff_content)
+    
+    print("Posting comment to GitHub...")
+    pr.create_issue_comment(f"## 🤖 AI Code Review Agent\n\n{review}")
+    print("Done.")
+
 if __name__ == "__main__":
-    print(f"Analyzing PR #{PR_NUMBER}...")
-    diff = get_diff()
-    if diff:
-        review = analyze_diff(diff)
-        pr.create_issue_comment(f"## 🤖 AI Review\n{review}")
+    main()
