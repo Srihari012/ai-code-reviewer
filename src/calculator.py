@@ -1,0 +1,10 @@
+def calculate(a,b):
+    return a/b
+
+def main():
+    print("Welcome to the Calculator")
+    val = calculate(5,10)
+    print("Result is: "+ val)
+
+if __name__ == "__manin__":
+    main()
